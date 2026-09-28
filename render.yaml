@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: platform-api
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: python3 server.py
+    healthCheckPath: /health
+    envVars:
+      - key: SITES_CONFIG
+        value: '{"checklane":{"name":"Checklane","notify_email":"adjkimm@gmail.com","from":"Checklane <onboarding@resend.dev>"}}'
+      # RESEND_API_KEY is set in the Render dashboard (secret) — notifications
+      # are fail-open without it, so the API works before the key is added.
