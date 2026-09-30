@@ -151,8 +151,17 @@ def keystone_well_known_path(issuer_id, filename):
         return None
     if filename not in ("keys.json", "revocations.json"):
         return None
-    path = os.path.join(HERE, "keystone", filename)
-    return path if os.path.exists(path) else None
+    # Per-issuer documents first, then the legacy single files, which
+    # belong to keystone-test only (never serve one issuer's keys for
+    # another issuer id).
+    candidates = [os.path.join(HERE, "keystone", "issuers", issuer_id,
+                               filename)]
+    if issuer_id == "keystone-test":
+        candidates.append(os.path.join(HERE, "keystone", filename))
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
 
 
 def send_notification(cfg, subject, body):
