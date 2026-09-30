@@ -1,7 +1,12 @@
 {
   "issuer_id": "acme-test",
   "key_id": "acme1-20260930",
-  "issued_at": 1790801451,
-  "revoked": [],
-  "sig": "G_YGSU4cT0jsNocEBSFpxY9AVkrwsXO8EoM9lXlWP_b2vBNfxEU7UE9Grpu36v2ZdUHzz2OQ5hhu3NLAV1OGDQ"
+  "issued_at": 1790801601,
+  "revoked": [
+    {
+      "credential_id": "0foOwwYt-hmTpGzylVCgJBGvZhdQQks-O_-CD3Ky8DyyG440nXSq0_f2zuLANADjn1dD0q5c8tPqQZTkWYNVAg",
+      "revoked_at": 1790801601
+    }
+  ],
+  "sig": "8nR6OLuVCT3JRGdmv6_Y94RrXw37muw80YzgXVxIXgVQ_ekDlUKovdl90grErquxkp7LRG9G2T9yVXyTCdbMDg"
 }
