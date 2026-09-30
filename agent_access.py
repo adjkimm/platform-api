@@ -39,6 +39,10 @@ CHECK_UA = ("AgentAccessCheck/1.0 "
             "(+https://adjkimm.github.io/keystone-site-staging/)")
 
 # slug -> display info. Order is fixed: the UI renders in this order.
+# Mirrors Checklane's AGENT_UAS (workspace/checklane/audit.py), which holds
+# the vendor documentation sources. token=None for user-triggered fetchers
+# whose vendors document robots.txt bypass — claiming a robots verdict for
+# them would be false.
 AGENTS = [
     {"id": "gptbot", "name": "GPTBot", "kind": "Training crawler",
      "ua": "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)",
@@ -48,6 +52,11 @@ AGENTS = [
      "ua": "Mozilla/5.0 (compatible; OAI-SearchBot/1.0; +https://openai.com/bot.html)",
      "blurb": "Fetches pages for ChatGPT's search answers.",
      "token": "oai-searchbot"},
+    {"id": "chatgpt-user", "name": "ChatGPT-User",
+     "kind": "On-demand fetcher",
+     "ua": "Mozilla/5.0 (compatible; ChatGPT-User/1.0; +https://openai.com/bot.html)",
+     "blurb": "Fetches a page when a ChatGPT user asks about it.",
+     "token": "chatgpt-user"},
     {"id": "claudebot", "name": "ClaudeBot", "kind": "Training crawler",
      "ua": "Mozilla/5.0 (compatible; ClaudeBot/1.0)",
      "blurb": "Crawls the web to train Anthropic's models.",
@@ -57,36 +66,149 @@ AGENTS = [
      "ua": "Mozilla/5.0 (compatible; Claude-SearchBot/1.0)",
      "blurb": "Fetches pages for Claude's search answers.",
      "token": "claude-searchbot"},
-    {"id": "ccbot", "name": "CCBot", "kind": "Dataset crawler",
-     "ua": "CCBot/2.0 (https://commoncrawl.org/faq/)",
-     "blurb": "Builds the open Common Crawl dataset many models train on.",
-     "token": "ccbot"},
-    {"id": "perplexitybot", "name": "PerplexityBot",
-     "kind": "Discovery crawler",
-     "ua": "Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://perplexity.ai)",
-     "blurb": "Finds pages for Perplexity's answers.",
-     "token": "perplexitybot"},
-    {"id": "chatgpt-user", "name": "ChatGPT-User",
+    {"id": "claude-user", "name": "Claude-User",
      "kind": "On-demand fetcher",
-     "ua": "Mozilla/5.0 (compatible; ChatGPT-User/1.0; +https://openai.com/bot.html)",
-     "blurb": "Fetches a page when a ChatGPT user asks about it.",
-     "token": "chatgpt-user"},
+     "ua": "Mozilla/5.0 (compatible; Claude-User/1.0)",
+     "blurb": "Fetches a page when a Claude user asks about it.",
+     "token": "claude-user"},
     {"id": "googleother", "name": "GoogleOther", "kind": "AI crawler",
      "ua": "Mozilla/5.0 (compatible; GoogleOther/1.0)",
      "blurb": "Google's crawler for AI features.",
      "token": "googleother"},
     {"id": "google-agent", "name": "Google-Agent",
      "kind": "Agentic fetcher",
-     "ua": "Mozilla/5.0 (compatible; Google-Agent/1.0)",
+     "ua": ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+             "(KHTML, like Gecko; compatible; Google-Agent; "
+             "+https://developers.google.com/crawling/docs/crawlers-fetchers/google-agent) "
+             "Chrome/126.0.0.0 Safari/537.36"),
      "blurb": "Google's agent-mode fetcher. Does not honor robots.txt.",
      "token": None},  # deliberately absent: claiming a robots verdict would be false
+    {"id": "meta-externalagent", "name": "Meta-ExternalAgent",
+     "kind": "Training crawler",
+     "ua": ("meta-externalagent/1.1 "
+             "(+https://developers.facebook.com/docs/sharing/webmasters/crawler)"),
+     "blurb": "Crawls for Meta AI model training and indexing.",
+     "token": "meta-externalagent"},
+    {"id": "meta-externalfetcher", "name": "Meta-ExternalFetcher",
+     "kind": "On-demand fetcher",
+     "ua": ("meta-externalfetcher/1.1 "
+             "(+https://developers.facebook.com/docs/sharing/webmasters/crawler)"),
+     "blurb": "Fetches pages when a Meta AI user asks. May bypass robots.txt.",
+     "token": None},
+    {"id": "meta-webindexer", "name": "Meta-WebIndexer",
+     "kind": "Search crawler",
+     "ua": ("meta-webindexer/1.1 "
+             "(+https://developers.facebook.com/docs/sharing/webmasters/crawler)"),
+     "blurb": "Indexes pages for Meta AI search answers.",
+     "token": "meta-webindexer"},
+    {"id": "applebot", "name": "Applebot",
+     "kind": "Search crawler",
+     "ua": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+             "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 "
+             "Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)"),
+     "blurb": "Powers Siri, Spotlight and Safari search; data may train Apple Intelligence.",
+     "token": "applebot"},
+    {"id": "perplexitybot", "name": "PerplexityBot",
+     "kind": "Discovery crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)"),
+     "blurb": "Finds pages for Perplexity's answers.",
+     "token": "perplexitybot"},
+    {"id": "perplexity-user", "name": "Perplexity-User",
+     "kind": "On-demand fetcher",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)"),
+     "blurb": "Fetches a page when a Perplexity user asks. Generally ignores robots.txt.",
+     "token": None},
+    {"id": "ccbot", "name": "CCBot", "kind": "Dataset crawler",
+     "ua": "CCBot/2.0 (https://commoncrawl.org/faq/)",
+     "blurb": "Builds the open Common Crawl dataset many models train on.",
+     "token": "ccbot"},
+    {"id": "ai2bot", "name": "AI2Bot", "kind": "Research crawler",
+     "ua": "Mozilla/5.0 (compatible) AI2Bot (+https://www.allenai.org/crawler)",
+     "blurb": "Allen Institute research crawl that trains open language models.",
+     "token": "ai2bot"},
+    {"id": "bytespider", "name": "Bytespider", "kind": "Training crawler",
+     "ua": ("Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 "
+             "(KHTML, like Gecko) Mobile Safari/537.36 "
+             "(compatible; Bytespider; spider-feedback@bytedance.com)"),
+     "blurb": "Collects content for ByteDance model training.",
+     "token": "bytespider"},
+    {"id": "youbot", "name": "YouBot", "kind": "Search crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "YouBot/1.0; +https://docs.you.com/youbot; env:prod) "
+             "Chrome/142.0.0.0 Safari/537.36"),
+     "blurb": "Indexes pages for You.com search answers.",
+     "token": "youbot"},
+    {"id": "duckassistbot", "name": "DuckAssistBot",
+     "kind": "Answer crawler",
+     "ua": "DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)",
+     "blurb": "Crawls pages in real time for DuckDuckGo AI-assisted answers.",
+     "token": "duckassistbot"},
+    {"id": "mistralai-user", "name": "MistralAI-User",
+     "kind": "On-demand fetcher",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "MistralAI-User/1.0; +https://docs.mistral.ai/robots)"),
+     "blurb": "Visits pages when a Mistral user asks; not used for training.",
+     "token": "mistralai-user"},
+    {"id": "mistralai-index", "name": "MistralAI-Index",
+     "kind": "Search crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "MistralAI-Index/1.0; +https://docs.mistral.ai/robots)"),
+     "blurb": "Indexes pages for Mistral search; not used for training.",
+     "token": "mistralai-index"},
+    {"id": "mistralai-training", "name": "MistralAI-Training",
+     "kind": "Training crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "MistralAI-Training/1.0; +https://docs.mistral.ai/robots)"),
+     "blurb": "Crawls content to train Mistral models.",
+     "token": "mistralai-training"},
+    {"id": "amazonbot", "name": "Amazonbot", "kind": "AI crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "Amazonbot/0.1) Chrome/126.0.0.0 Safari/537.36"),
+     "blurb": "Improves Amazon products and services; may train Amazon AI models.",
+     "token": "amazonbot"},
+    {"id": "amzn-searchbot", "name": "Amzn-SearchBot",
+     "kind": "Search crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "Amzn-SearchBot/0.1) Chrome/126.0.0.0 Safari/537.36"),
+     "blurb": "Indexes pages for Alexa and Amazon search; not for training.",
+     "token": "amzn-searchbot"},
+    {"id": "amzn-user", "name": "Amzn-User",
+     "kind": "On-demand fetcher",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "
+             "Amzn-User/0.1) Chrome/126.0.0.0 Safari/537.36"),
+     "blurb": "Fetches pages for Alexa answers. May not follow all robots.txt rules.",
+     "token": None},
+    {"id": "kimibot", "name": "KimiBot", "kind": "Training crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; "
+             "KimiBot/1.0; +https://www.kimi.com/policies/kimi-crawlers"),
+     "blurb": "Crawls content that may train Kimi's foundation models.",
+     "token": "kimibot"},
+    {"id": "kimi-searchbot", "name": "Kimi-SearchBot",
+     "kind": "Search crawler",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; "
+             "Kimi-SearchBot/1.0; +https://www.kimi.com/policies/kimi-crawlers"),
+     "blurb": "Builds the index behind Kimi search features.",
+     "token": "kimi-searchbot"},
+    {"id": "kimi-user", "name": "Kimi-User",
+     "kind": "On-demand fetcher",
+     "ua": ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; "
+             "Kimi-User/1.0; +https://www.kimi.com/policies/kimi-crawlers"),
+     "blurb": "Fetches pages when a Kimi user asks. User-triggered; robots.txt may not apply.",
+     "token": None},
 ]
 
 AI_CRAWLER_TOKENS = [
     "gptbot", "oai-searchbot", "google-extended", "googleother",
-    "claudebot", "claude-searchbot", "ccbot",
+    "claudebot", "claude-searchbot", "claude-user", "ccbot", "ai2bot",
     "perplexitybot", "chatgpt-user", "anthropic-ai", "cohere-ai",
-    "bytespider", "amazonbot",
+    "bytespider", "youbot", "duckassistbot",
+    "mistralai-user", "mistralai-index", "mistralai-training",
+    "amazonbot", "amzn-searchbot",
+    "meta-externalagent", "meta-webindexer",
+    "applebot", "kimibot", "kimi-searchbot",
+    "firecrawlagent",
 ]
 
 BLOCKED_STATUSES = {401, 403, 407, 429}
