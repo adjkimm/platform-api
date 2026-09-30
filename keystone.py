@@ -158,11 +158,13 @@ def _load_revocation_list(issuer_id):
 
     doc, fresh = None, False
     try:
-        # Per-issuer revocation list first, then the legacy single file
-        # (keystone-test, kept for the daily re-issue job).
+        # The revocation list lives next to the issuer's key document
+        # (served at the well-known path). The legacy single file is
+        # keystone-test's, kept for the daily re-issue job. The doc's
+        # own issuer_id must match — never trust a list by path alone.
         candidates = [
-            os.path.join(HERE, "keystone", "revocations",
-                         issuer_id + ".json"),
+            os.path.join(HERE, "keystone", "issuers", issuer_id,
+                         "revocations.json"),
             os.path.join(HERE, "keystone", "revocations.json"),
         ]
         raw = None
