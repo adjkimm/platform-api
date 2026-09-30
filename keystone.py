@@ -38,8 +38,10 @@ DEMO_TTL_S = 48 * 3600       # demo credential lifetime, per brief
 WELL_KNOWN_BASE = "/.well-known/agent-identity/v1"
 
 # Issuer registry. Public information only — no private keys here.
-# NOTE: "keystone-test" is an internal test identifier and will be
-# renamed when the product name is chosen.
+# NOTE: "keystone-test" and "acme-test" are internal test identifiers and
+# will be renamed when the product name is chosen. During the test phase
+# new issuers are added here manually; the spec's long-term design is key
+# discovery from the issuer's own domain (see spec-draft-01.md).
 ISSUERS = {
     "keystone-test": {
         "name": "Keystone test issuer",
@@ -47,6 +49,17 @@ ISSUERS = {
         # base64url of the raw 32-byte Ed25519 public key. Filled in by
         # the key-generation step (see keystone/keys.json).
         "public_key": "T80zCoXqmXYr0ApVCkM3-3uCMbdB2nEJ9zKGmoSHTdE",
+        "note": "Internal test identifier. Will be renamed when the "
+                "product name is chosen.",
+    },
+    "acme-test": {
+        "name": "ACME test issuer",
+        "key_id": "acme1-20260930",
+        # End-to-end issuer-flow test issuer (not a real builder).
+        # Public key filled in by the keystone-issuer.py keygen step.
+        "public_key": "YDSpAg08umy3dYDgxKSVKaaPaWhkCEfmsc4pN4SzLm4",
+        "note": "End-to-end test issuer for the issuer toolkit flow. "
+                "Not a real builder.",
     },
 }
 
@@ -145,11 +158,27 @@ def _load_revocation_list(issuer_id):
 
     doc, fresh = None, False
     try:
-        path = os.path.join(HERE, "keystone", "revocations.json")
-        with open(path, encoding="utf-8") as f:
-            raw = json.load(f)
-        if (isinstance(raw, dict) and raw.get("issuer_id") == issuer_id
-                and isinstance(raw.get("revoked"), list)
+        # Per-issuer revocation list first, then the legacy single file
+        # (keystone-test, kept for the daily re-issue job).
+        candidates = [
+            os.path.join(HERE, "keystone", "revocations",
+                         issuer_id + ".json"),
+            os.path.join(HERE, "keystone", "revocations.json"),
+        ]
+        raw = None
+        for path in candidates:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    candidate = json.load(f)
+            except FileNotFoundError:
+                continue
+            if (isinstance(candidate, dict)
+                    and candidate.get("issuer_id") == issuer_id):
+                raw = candidate
+                break
+        if raw is None:
+            raise FileNotFoundError
+        if (isinstance(raw.get("revoked"), list)
                 and _is_int(raw.get("issued_at"))
                 and isinstance(raw.get("sig"), str)):
             issuer = ISSUERS.get(issuer_id)
@@ -243,8 +272,6 @@ def issuer_list(base_url):
             "key_id": info["key_id"],
             "keys_url": (base_url + WELL_KNOWN_BASE +
                          "/issuers/%s/keys.json" % issuer_id),
-            "note": "Internal test identifier. Will be renamed when the "
-                    "product name is chosen." if issuer_id == "keystone-test"
-                    else "",
+            "note": info.get("note", ""),
         })
     return {"issuers": out, "spec": SPEC_VERSION}
