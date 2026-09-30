@@ -1,0 +1,12 @@
+{
+  "issuer_id": "keystone-test",
+  "key_id": "kt1-20260930",
+  "issued_at": 1790800799,
+  "revoked": [
+    {
+      "credential_id": "D9F9FB1qV_UXL1eD3NjAafh1u9TTqh3gWaINh_pAGBEVVVPmRy7Lm7FOGtPDSRskPBi_mvEyTVDYANMGqg5gDQ",
+      "revoked_at": 1790800799
+    }
+  ],
+  "sig": "mlxBZ_tMe-EO_drZKKj77GpJNhyn4qZ8SLq-SeCUIGrYEAyJQUZgs2FJV0W04f2tiNVon9_r2OOg2Eu2ExSJAw"
+}
