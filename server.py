@@ -35,6 +35,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import agent_access
+import ed25519
+import keystone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
@@ -55,6 +57,12 @@ _rate_buckets = {}
 # so it gets its own tighter bucket: max checks per IP per rolling minute.
 ACCESS_CHECK_PER_MIN = int(os.environ.get("ACCESS_CHECK_PER_MIN", "6"))
 _access_buckets = {}
+
+# The Keystone verifier is a cheap local check; builders hammer it while
+# testing, so it gets its own 60/min/IP bucket (exempt from the global
+# POST bucket below).
+VERIFY_PER_MIN = int(os.environ.get("VERIFY_PER_MIN", "60"))
+_verify_buckets = {}
 
 
 def ensure_data_dir():
@@ -123,6 +131,28 @@ def check_access_rate(ip):
     bucket.append(now)
     _access_buckets[ip] = bucket
     return True
+
+
+def check_verify_rate(ip):
+    now = time.time()
+    bucket = _verify_buckets.get(ip, [])
+    bucket = [t for t in bucket if now - t < 60]
+    if len(bucket) >= VERIFY_PER_MIN:
+        _verify_buckets[ip] = bucket
+        return False
+    bucket.append(now)
+    _verify_buckets[ip] = bucket
+    return True
+
+
+def keystone_well_known_path(issuer_id, filename):
+    """Resolve a well-known issuer document to a file on disk."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", issuer_id or ""):
+        return None
+    if filename not in ("keys.json", "revocations.json"):
+        return None
+    path = os.path.join(HERE, "keystone", filename)
+    return path if os.path.exists(path) else None
 
 
 def send_notification(cfg, subject, body):
@@ -266,6 +296,21 @@ class Handler(BaseHTTPRequestHandler):
             })
             return self._json(200, result)
 
+        if path == "/api/issuers":
+            host = self.headers.get("Host") or "platform-api-yf9l.onrender.com"
+            base_url = "https://" + host
+            return self._json(200, keystone.issuer_list(base_url))
+
+        wk_prefix = keystone.WELL_KNOWN_BASE + "/issuers/"
+        if path.startswith(wk_prefix):
+            rest = path[len(wk_prefix):].split("/")
+            if len(rest) == 2:
+                fpath = keystone_well_known_path(rest[0], rest[1])
+                if fpath:
+                    with open(fpath, "rb") as f:
+                        return self._send(200, f.read())
+            return self._not_found()
+
         if path == "/api/v1/stats":
             site_id = (qs.get("site_id") or [""])[0].strip()
             if not site_config(site_id):
@@ -282,10 +327,17 @@ class Handler(BaseHTTPRequestHandler):
         return self._not_found()
 
     def do_POST(self):
-        if not check_rate(self._client_ip()):
-            return self._json(429, {"error": "rate limited, try again soon"})
         parsed = urllib.parse.urlsplit(self.path)
         path = parsed.path
+
+        # The Keystone verifier has its own 60/min/IP bucket and is
+        # exempt from the global POST bucket.
+        if path == "/api/verify":
+            if not check_verify_rate(self._client_ip()):
+                return self._json(429, {"error": "rate limited, try again soon"})
+        elif not check_rate(self._client_ip()):
+            return self._json(429, {"error": "rate limited, try again soon"})
+
         raw = self._read_body()
         if raw is None:
             return self._json(400, {"error": "missing or oversized body"})
@@ -293,6 +345,15 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(raw.decode("utf-8"))
         except Exception:
             return self._json(400, {"error": "body must be JSON"})
+
+        if path == "/api/verify":
+            resp = keystone.verify_credential(data)
+            log_event("verify", {
+                "valid": resp["valid"],
+                "reason": resp.get("reason"),
+                "issuer": (resp.get("issuer") or {}).get("id"),
+            })
+            return self._json(200, resp)
 
         if path == "/api/v1/leads":
             site_id = str(data.get("site_id", "")).strip()
