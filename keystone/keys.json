@@ -1,0 +1,17 @@
+{
+  "issuer": {
+    "id": "keystone-test",
+    "name": "Keystone test issuer"
+  },
+  "keys": [
+    {
+      "key_id": "kt1-20260930",
+      "alg": "Ed25519",
+      "public_key": "T80zCoXqmXYr0ApVCkM3-3uCMbdB2nEJ9zKGmoSHTdE",
+      "encoding": "base64url of raw 32-byte public key",
+      "created_at": "2026-09-30T00:00:00Z"
+    }
+  ],
+  "revocations": "https://platform-api-yf9l.onrender.com/.well-known/agent-identity/v1/issuers/keystone-test/revocations.json",
+  "note": "keystone-test is an internal test identifier. It will be renamed when the product name is chosen."
+}
