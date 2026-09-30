@@ -1,0 +1,7 @@
+{
+  "issuer_id": "acme-test",
+  "key_id": "acme1-20260930",
+  "issued_at": 1790801451,
+  "revoked": [],
+  "sig": "G_YGSU4cT0jsNocEBSFpxY9AVkrwsXO8EoM9lXlWP_b2vBNfxEU7UE9Grpu36v2ZdUHzz2OQ5hhu3NLAV1OGDQ"
+}
