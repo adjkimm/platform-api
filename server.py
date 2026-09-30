@@ -34,6 +34,8 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import agent_access
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
 
@@ -48,6 +50,11 @@ except Exception:
 # Light abuse throttle: max POSTs per IP per rolling minute.
 RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "30"))
 _rate_buckets = {}
+
+# The agent-access check fans out to ~10 outbound fetches per request,
+# so it gets its own tighter bucket: max checks per IP per rolling minute.
+ACCESS_CHECK_PER_MIN = int(os.environ.get("ACCESS_CHECK_PER_MIN", "6"))
+_access_buckets = {}
 
 
 def ensure_data_dir():
@@ -103,6 +110,18 @@ def check_rate(ip):
         return False
     bucket.append(now)
     _rate_buckets[ip] = bucket
+    return True
+
+
+def check_access_rate(ip):
+    now = time.time()
+    bucket = _access_buckets.get(ip, [])
+    bucket = [t for t in bucket if now - t < 60]
+    if len(bucket) >= ACCESS_CHECK_PER_MIN:
+        _access_buckets[ip] = bucket
+        return False
+    bucket.append(now)
+    _access_buckets[ip] = bucket
     return True
 
 
@@ -178,8 +197,23 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        # The static sites call this API cross-origin (e.g. GitHub Pages ->
+        # Render), so every API response carries permissive CORS headers.
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
+
+    def _cors_preflight(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods",
+                         "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_OPTIONS(self):
+        self._cors_preflight()
 
     def _json(self, code, obj):
         self._send(code, json.dumps(obj))
@@ -212,6 +246,25 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/health":
             return self._json(200, {"ok": True, "ts": int(time.time())})
+
+        if path == "/api/agent-access":
+            if not check_access_rate(self._client_ip()):
+                return self._json(429, {"error": "rate limited, try again soon"})
+            domain = (qs.get("domain") or [""])[0]
+            try:
+                result = agent_access.check_agent_access(domain)
+            except ValueError as e:
+                return self._json(400, {"error": str(e)[:200]})
+            except Exception:
+                return self._json(502, {"error": "check failed, try again"})
+            log_event("agent_access", {
+                "domain": result["domain"],
+                "ms": result["elapsed_ms"],
+                "can_reach": result["summary"]["can_reach"],
+                "blocked": result["summary"]["blocked"],
+                "unknown": result["summary"]["unknown"],
+            })
+            return self._json(200, result)
 
         if path == "/api/v1/stats":
             site_id = (qs.get("site_id") or [""])[0].strip()
