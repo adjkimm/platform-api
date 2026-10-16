@@ -1,12 +1,12 @@
 {
   "issuer_id": "keystone-test",
   "key_id": "kt1-20260930",
-  "issued_at": 1792071494,
+  "issued_at": 1792157889,
   "revoked": [
     {
-      "credential_id": "BiAvjESXBwQTzko_48CzOadjhcyDQG-5FX250ReMTHjtdddEK3D55uNQMFKFAHYlxGVuBoWmAlq8xan9AR75AA",
-      "revoked_at": 1792071494
+      "credential_id": "714sytKqhqVfwfU7I1r55duWn01JxRyK4Gf1qK4NdNy64PgGMiNLAX6XXTy_fo-DeiW6iUCIX6P26csa5OywCw",
+      "revoked_at": 1792157889
     }
   ],
-  "sig": "QuMof_qNsV8zJleWZOlA2YqFvqyy533eD4YS4Qrz6ig1kejHG23WCtgt1bme0V412wCPjYYdUAKNREIEid1uBw"
+  "sig": "AkSOhPtCJ8_qFIGPaSaXM3oDORt8Oyv6Qd9TtFpfEB0c_wZqoFrODO1rwVLB1RSblBT8ti398XM4c0m-raDFCQ"
 }
